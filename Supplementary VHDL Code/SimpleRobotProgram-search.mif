@@ -1,0 +1,243 @@
+-- Altera Memory Initialization File (MIF)
+
+DEPTH = 2048;
+WIDTH = 16;
+
+ADDRESS_RADIX = HEX;
+DATA_RADIX = HEX;
+
+CONTENT
+  BEGIN
+    [000..7FF] : 0000;  -- Default to NOP
+
+           000 : 08C1;  -- 	LOAD   Zero
+           001 : 9883;  -- 	OUT    LVELCMD     ; Stop motors
+           002 : 988B;  -- 	OUT    RVELCMD
+           003 : 98B2;  -- 	OUT    SONAREN     ; Disable sonar (optional)
+           004 : 980A;  -- 	OUT    BEEP        ; Stop any beeping (optional)
+           005 : 80A6;  -- 	CALL   SetupI2C    ; Configure the I2C to read the battery voltage
+           006 : 8088;  -- 	CALL   BattCheck   ; Get battery voltage (and end if too low).
+           007 : 9806;  -- 	OUT    LCD         ; Display battery voltage (hex, tenths of volts)
+           008 : 9003;  -- 	IN     XIO         ; XIO contains SAFETY signal
+           009 : 48D0;  -- 	AND    Mask4       ; SAFETY signal is bit 4
+           00A : 3810;  -- 	JPOS   WaitForUser ; If ready, jump to wait for PB3
+           00B : 9002;  -- 	IN     TIMER       ; We'll use the timer value to
+           00C : 48CD;  -- 	AND    Mask1       ;  blink LED17 as a reminder to toggle SW17
+           00D : 6008;  -- 	SHIFT  8           ; Shift over to LED17
+           00E : 9807;  -- 	OUT    XLEDS       ; LED17 blinks at 2.5Hz (10Hz/4)
+           00F : 2808;  -- 	JUMP   WaitForSafety
+           010 : 9002;  -- 	IN     TIMER       ; We'll blink the LEDs above PB3
+           011 : 48CD;  -- 	AND    Mask1
+           012 : 6005;  -- 	SHIFT  5           ; Both LEDG6 and LEDG7
+           013 : 10BC;  -- 	STORE  Temp        ; (overkill, but looks nice)
+           014 : 6001;  -- 	SHIFT  1
+           015 : 50BC;  -- 	OR     Temp
+           016 : 9807;  -- 	OUT    XLEDS
+           017 : 9003;  -- 	IN     XIO         ; XIO contains KEYs
+           018 : 48CE;  -- 	AND    Mask2       ; KEY3 mask (KEY0 is reset and can't be read)
+           019 : 3810;  -- 	JPOS   WaitForUser ; not ready (KEYs are active-low, hence JPOS)
+           01A : 08C1;  -- 	LOAD   Zero
+           01B : 9807;  -- 	OUT    XLEDS       ; clear LEDs once ready to continue
+           01C : 281D;  --         JUMP MainLoop
+           01D : 802F;  --         CALL IsFinished
+           01E : 806C;  --         CALL CheckSonar ;Store object positions from sonar here
+           01F : 08C1;  --         LOAD Zero
+           020 : 10BD;  --         STORE HasMoved
+           021 : 806D;  --         CALL CheckRight  ;If the right side is clear, move right
+           022 : 3830;  --         JPOS MoveRight
+           023 : 08BD;  --         LOAD HasMoved ;Check if we just moved
+           024 : 381D;  --         JPOS MainLoop
+           025 : 8070;  --         CALL CheckForward ;If the front is clear, move forward
+           026 : 3836;  --         JPOS MoveForward
+           027 : 08BD;  --         LOAD HasMoved ;Check if we just moved
+           028 : 381D;  --         JPOS MainLoop
+           029 : 8075;  --         CALL CheckLeft  ;If the left is clear, move left
+           02A : 383C;  --         JPOS MoveLeft
+           02B : 08BD;  --         LOAD HasMoved ;Check if we just moved
+           02C : 381D;  --         JPOS MainLoop
+           02D : 8042;  --         CALL MoveBackward
+           02E : 281D;  --         JUMP MainLoop
+           02F : 8800;  --         RETURN
+           030 : 8045;  --         CALL LoadPosition
+           031 : 806A;  --         CALL HasVisited
+           032 : 386B;  --         JPOS EarlyReturn
+           033 : 8044;  --         CALL StorePosition
+           034 : 8069;  --         CALL MarkVisited
+           035 : 8800;  --         RETURN
+           036 : 8045;  --         CALL LoadPosition
+           037 : 806A;  --         CALL HasVisited
+           038 : 386B;  --         JPOS EarlyReturn
+           039 : 8044;  --         CALL StorePosition
+           03A : 8069;  --         CALL MarkVisited
+           03B : 8800;  --         RETURN
+           03C : 8045;  --         CALL LoadPosition
+           03D : 806A;  --         CALL HasVisited
+           03E : 386B;  --         JPOS EarlyReturn
+           03F : 8044;  --         CALL StorePosition
+           040 : 8069;  --         CALL MarkVisited
+           041 : 8800;  --         RETURN
+           042 : 8068;  --         CALL DecrementPosition
+           043 : 8800;  -- 		RETURN
+           044 : 8800;  --         RETURN
+           045 : 08C1;  --         LOAD Zero
+           046 : 10BF;  --         STORE VARY  ;sets robot's Y-tile position to 0
+           047 : 90C0;  --         IN XPOS		;gets robot's actual X position (forward = x-axis)
+           048 : 2245;  -- GetY:   SUB 581		;subtract 2 feet
+           049 : 10BC;  --         STORE Temp	;save the remainder
+           04A : 304F;  --         JNEG GetX   ;if remainder is 0 or negative, done
+           04B : 404F;  --         JZERO GetX
+           04C : 08BF;  --         LOAD VARY   ;if remainder is greater than 0
+           04D : 1801;  --         ADD 1		;increase tile count by one
+           04E : 2848;  --         JUMP GetY	;repeat
+           04F : 9804;  -- GetX:   OUT SSEG1	;prints VARY to 7-seg display for debugging
+           050 : 08C1;  -- 		LOAD Zero
+           051 : 10BE;  --         STORE VARX  ;sets robot's X-tile position to 0
+           052 : 90C1;  --         IN YPOS     ;gets robot's actual Y-position
+           053 : 4055;  --         JZERO GetXCenter
+           054 : 3058;  --         JNEG  GetXLeft
+           055 : 08C1;  -- GetXCenter: LOAD  Zero
+           056 : 1803;  -- 			ADD	  3
+           057 : 10BE;  -- 			STORE VARX 
+           058 : 1A45;  -- GetXLeft:   ADD 581		;subtract 2 feet
+           059 : 10BC;  --         	STORE Temp	;save the remainder
+           05A : 3866;  --         	JPOS PositionDone  ;if remainder is 0 or positive, done
+           05B : 4066;  --         	JZERO PositionDone 
+           05C : 08BF;  --         	LOAD VARY   ;if remainder is greater than 0
+           05D : 1801;  --         	ADD 1		;increase tile count by one
+           05E : 285F;  --         	JUMP GetXRight
+           05F : 2245;  -- GetXRight: 	SUB 581		;subtract 2 feet
+           060 : 10BC;  --         	STORE Temp	;save the remainder
+           061 : 3066;  --         	JNEG PositionDone ;if remainder is 0 or negative, done
+           062 : 4066;  --         	JZERO PositionDone 
+           063 : 08BF;  --         	LOAD VARY   ;if remainder is greater than 0
+           064 : 1801;  --         	ADD 1		;increase tile count by one
+           065 : 285F;  --         	JUMP GetXRight
+           066 : 9805;  -- 		OUT SSEG2  ;prints VARX to 7-seg display for debugging      
+           067 : 8800;  --         RETURN
+           068 : 8800;  --         RETURN
+           069 : 8800;  --         RETURN
+           06A : 8800;  --         RETURN
+           06B : 8800;  --     RETURN
+           06C : 8800;  -- 	RETURN
+           06D : 90AD;  -- 	IN DIST5
+           06E : 2262;  -- 	SUB 610		;check if 2 feet away
+           06F : 8800;  -- 	RETURN
+           070 : 90AA;  -- 	IN DIST2
+           071 : 2262;  -- 	SUB 610		;check if 2 feet away
+           072 : 90AB;  -- 	IN DIST3
+           073 : 2262;  -- 	SUB 610
+           074 : 8800;  -- 	RETURN
+           075 : 90A8;  -- 	IN DIST0
+           076 : 2262;  -- 	SUB 610		;check if 2 feet away
+           077 : 8800;  -- 	RETURN
+           078 : 08C1;  -- 	LOAD   Zero         ; Stop everything.
+           079 : 9883;  -- 	OUT    LVELCMD
+           07A : 988B;  -- 	OUT    RVELCMD
+           07B : 98B2;  -- 	OUT    SONAREN
+           07C : 087F;  -- 	LOAD   DEAD         ; An indication that we are dead
+           07D : 9805;  -- 	OUT    SSEG2
+           07E : 287E;  -- 	JUMP   Forever      ; Do this forever.
+           07F : DEAD;  -- 	DEAD:  DW &HDEAD    ; Example of a "local" variable
+           080 : 9802;  -- 	OUT    TIMER
+           081 : 90C9;  -- 	IN     LIN
+           082 : 9805;  -- 	OUT    SSEG2
+           083 : 9002;  -- 	IN     TIMER
+           084 : 9807;  -- 	OUT    XLEDS       ; User-feedback that a pause is occurring.
+           085 : 6FF6;  -- 	ADDI   -10         ; 1 second in 10Hz.
+           086 : 3081;  -- 	JNEG   Wloop
+           087 : 8800;  -- 	RETURN
+           088 : 80A0;  -- 	CALL   GetBattLvl
+           089 : 4088;  -- 	JZERO  BattCheck   ; A/D hasn't had time to initialize
+           08A : 20E3;  -- 	SUB    MinBatt
+           08B : 308E;  -- 	JNEG   DeadBatt
+           08C : 18E3;  -- 	ADD    MinBatt     ; get original value back
+           08D : 8800;  -- 	RETURN
+           08E : 08C5;  -- 	LOAD   Four
+           08F : 980A;  -- 	OUT    BEEP        ; start beep sound
+           090 : 80A0;  -- 	CALL   GetBattLvl  ; get the battery level
+           091 : 9804;  -- 	OUT    SSEG1       ; display it everywhere
+           092 : 9805;  -- 	OUT    SSEG2
+           093 : 9806;  -- 	OUT    LCD
+           094 : 08C1;  -- 	LOAD   Zero
+           095 : 6FFF;  -- 	ADDI   -1          ; 0xFFFF
+           096 : 9801;  -- 	OUT    LEDS        ; all LEDs on
+           097 : 9807;  -- 	OUT    XLEDS
+           098 : 8080;  -- 	CALL   Wait1       ; 1 second
+           099 : 08C1;  -- 	Load   Zero
+           09A : 980A;  -- 	OUT    BEEP        ; stop beeping
+           09B : 08C1;  -- 	LOAD   Zero
+           09C : 9801;  -- 	OUT    LEDS        ; LEDs off
+           09D : 9807;  -- 	OUT    XLEDS
+           09E : 8080;  -- 	CALL   Wait1       ; 1 second
+           09F : 288E;  -- 	JUMP   DeadBatt    ; repeat forever
+           0A0 : 08E5;  -- 	LOAD   I2CRCmd     ; 0x0190 (write 0B, read 1B, addr 0x90)
+           0A1 : 9890;  -- 	OUT    I2C_CMD     ; to I2C_CMD
+           0A2 : 9892;  -- 	OUT    I2C_RDY     ; start the communication
+           0A3 : 80AE;  -- 	CALL   BlockI2C    ; wait for it to finish
+           0A4 : 9091;  -- 	IN     I2C_DATA    ; get the returned data
+           0A5 : 8800;  -- 	RETURN
+           0A6 : 80AE;  -- 	CALL   BlockI2C    ; wait for idle
+           0A7 : 08E4;  -- 	LOAD   I2CWCmd     ; 0x1190 (write 1B, read 1B, addr 0x90)
+           0A8 : 9890;  -- 	OUT    I2C_CMD     ; to I2C_CMD register
+           0A9 : 08C1;  -- 	LOAD   Zero        ; 0x0000 (A/D port 0, no increment)
+           0AA : 9891;  -- 	OUT    I2C_DATA    ; to I2C_DATA register
+           0AB : 9892;  -- 	OUT    I2C_RDY     ; start the communication
+           0AC : 80AE;  -- 	CALL   BlockI2C    ; wait for it to finish
+           0AD : 8800;  -- 	RETURN
+           0AE : 08C1;  -- 	LOAD   Zero
+           0AF : 10BC;  -- 	STORE  Temp        ; Used to check for timeout
+           0B0 : 08BC;  -- 	LOAD   Temp
+           0B1 : 6801;  -- 	ADDI   1           ; this will result in ~0.1s timeout
+           0B2 : 10BC;  -- 	STORE  Temp
+           0B3 : 40B7;  -- 	JZERO  I2CError    ; Timeout occurred; error
+           0B4 : 9092;  -- 	IN     I2C_RDY     ; Read busy signal
+           0B5 : 38B0;  -- 	JPOS   BI2CL       ; If not 0, try again
+           0B6 : 8800;  -- 	RETURN             ; Else return
+           0B7 : 08C1;  -- 	LOAD   Zero
+           0B8 : 692C;  -- 	ADDI   &H12C       ; "I2C"
+           0B9 : 9804;  -- 	OUT    SSEG1
+           0BA : 9805;  -- 	OUT    SSEG2       ; display error message
+           0BB : 28B7;  -- 	JUMP   I2CError
+           0BC : 0000;  -- Temp:   DW 		0 		; "Temp" is not a great name, but can be useful
+           0BD : 0000;  -- HasMoved: DW     0
+           0BE : 0000;  -- VARX:   DW      &H0000
+           0BF : 0000;  -- VARY:   DW      &H0000
+           0C0 : FFFF;  -- NegOne:   DW -1
+           0C1 : 0000;  -- Zero:     DW 0
+           0C2 : 0001;  -- One:      DW 1
+           0C3 : 0002;  -- Two:      DW 2
+           0C4 : 0003;  -- Three:    DW 3
+           0C5 : 0004;  -- Four:     DW 4
+           0C6 : 0005;  -- Five:     DW 5
+           0C7 : 0006;  -- Six:      DW 6
+           0C8 : 0007;  -- Seven:    DW 7
+           0C9 : 0008;  -- Eight:    DW 8
+           0CA : 0009;  -- Nine:     DW 9
+           0CB : 000A;  -- Ten:      DW 10
+           0CC : 0001;  -- Mask0:    DW &B00000001
+           0CD : 0002;  -- Mask1:    DW &B00000010
+           0CE : 0004;  -- Mask2:    DW &B00000100
+           0CF : 0008;  -- Mask3:    DW &B00001000
+           0D0 : 0010;  -- Mask4:    DW &B00010000
+           0D1 : 0020;  -- Mask5:    DW &B00100000
+           0D2 : 0040;  -- Mask6:    DW &B01000000
+           0D3 : 0080;  -- Mask7:    DW &B10000000
+           0D4 : 00FF;  -- LowByte:  DW &HFF      ; binary 00000000 1111111
+           0D5 : 000F;  -- LowNibl:  DW &HF       ; 0000 0000 0000 1111
+           0D6 : 03C1;  -- OneMeter: DW 961       ; ~1m in 1.04mm units
+           0D7 : 01E1;  -- HalfMeter: DW 481      ; ~0.5m in 1.04mm units
+           0D8 : 024A;  -- TwoFeet:  DW 586       ; ~2ft in 1.04mm units
+           0D9 : 005A;  -- Deg90:    DW 90        ; 90 degrees in odometer units
+           0DA : 00B4;  -- Deg180:   DW 180       ; 180
+           0DB : 010E;  -- Deg270:   DW 270       ; 270
+           0DC : 0168;  -- Deg360:   DW 360       ; can never actually happen; for math only
+           0DD : 0064;  -- FSlow:    DW 100       ; 100 is about the lowest velocity value that will move
+           0DE : FF9C;  -- RSlow:    DW -100
+           0DF : 015E;  -- FMid:     DW 350       ; 350 is a medium speed
+           0E0 : FEA2;  -- RMid:     DW -350
+           0E1 : 01F4;  -- FFast:    DW 500       ; 500 is almost max speed (511 is max)
+           0E2 : FE0C;  -- RFast:    DW -500
+           0E3 : 008C;  -- MinBatt:  DW 140       ; 14.0V - minimum safe battery voltage
+           0E4 : 1190;  -- I2CWCmd:  DW &H1190    ; write one i2c byte, read one byte, addr 0x90
+           0E5 : 0190;  -- I2CRCmd:  DW &H0190    ; write nothing, read one byte, addr 0x90
+  END;
